@@ -52,6 +52,15 @@ const loginStrategies = {
     logout() {
       document.location.href = `${baseURL}/logout-callback`;
     }
+  },
+
+  empower: {
+    login() {
+      // handled by React login component
+    },
+    logout() {
+      document.location.href = `${baseURL}/logout-callback`;
+    }
   }
 };
 

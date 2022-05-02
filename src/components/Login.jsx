@@ -18,7 +18,9 @@ class Login extends React.Component {
       active: "login"
     };
 
-    this.isLocalLogin = window.PASSPORT_STRATEGY === "local";
+    this.isLocalLogin =
+      (window.PASSPORT_STRATEGY === "local") |
+      (window.PASSPORT_STRATEGY === "empower");
   }
 
   styles = StyleSheet.create({

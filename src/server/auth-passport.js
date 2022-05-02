@@ -4,6 +4,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import slack from "@aoberoi/passport-slack";
 import { User, cacheableData } from "./models";
 import localAuthHelpers from "./local-auth-helpers";
+import empowerAuthHelpers from "./empower-auth-helpers";
 import wrap from "./wrap";
 import { capitalizeWord } from "./api/lib/utils";
 
@@ -81,6 +82,63 @@ export function setupAuth0Passport() {
         res.redirect(nextUrlRedirect(req.query.state));
         return;
       })
+    ]
+  };
+}
+
+export function setupEmpowerPassport() {
+  const strategy = new LocalStrategy(
+    {
+      usernameField: "email",
+      passReqToCallback: true
+    },
+    wrap(async (req, username, password, done) => {
+      const lowerCaseEmail = username.toLowerCase();
+      const existingUser = await User.filter({ email: lowerCaseEmail });
+      const nextUrl = req.body.nextUrl || "";
+      const uuidMatch = nextUrl.match(/\w{8}-(\w{4}\-){3}\w{12}/);
+
+      // Run login, signup, or reset functions based on request data
+      if (req.body.authType && !localAuthHelpers[req.body.authType]) {
+        return done(null, false);
+      }
+      try {
+        const user = await empowerAuthHelpers[req.body.authType]({
+          lowerCaseEmail,
+          password,
+          existingUser,
+          nextUrl,
+          uuidMatch,
+          reqBody: req.body
+        });
+        return done(null, user);
+      } catch (err) {
+        return done(null, false, err.message);
+      }
+    })
+  );
+
+  passport.use(strategy);
+
+  passport.serializeUser((user, done) => {
+    done(null, user.id);
+  });
+
+  passport.deserializeUser(
+    wrap(async (id, done) => {
+      const userId = parseInt(id, 10);
+      const user =
+        userId && (await cacheableData.user.userLoggedIn("id", userId));
+      done(null, user || false);
+    })
+  );
+
+  return {
+    loginCallback: [
+      passport.authenticate("local"),
+      (req, res) => {
+        res.redirect(nextUrlRedirect(req.body.nextUrl));
+      }
     ]
   };
 }
@@ -263,5 +321,6 @@ export function setupSlackPassport(app) {
 export default {
   local: setupLocalAuthPassport,
   auth0: setupAuth0Passport,
-  slack: setupSlackPassport
+  slack: setupSlackPassport,
+  empower: setupEmpowerPassport
 };
